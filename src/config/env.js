@@ -1,38 +1,28 @@
-const dotenv = require("dotenv");
-const { z } = require("zod");
-const { MESSAGE_PROCESSOR_INTERVAL_MS } = require("./constants");
+﻿import dotenv from "dotenv";
 
 dotenv.config();
 
-const envSchema = z.object({
-  NODE_ENV: z.string().default("development"),
-  PORT: z.coerce.number().int().positive().default(3000),
-  DATABASE_URL: z.string().min(1),
-  APP_SECRET: z.string().min(32),
-  IS_MANAGER_ON: z
-    .string()
-    .optional()
-    .transform((value) => value === "true"),
-  JOB_INTERVAL_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(MESSAGE_PROCESSOR_INTERVAL_MS),
-  TWILIO_ACCOUNT_SID: z.string().optional().default(""),
-  TWILIO_AUTH_TOKEN: z.string().optional().default(""),
-  TWILIO_PHONE_NUMBER: z.string().optional().default(""),
-  RESEND_API_KEY: z.string().optional().default(""),
-  RESEND_FROM_EMAIL: z.string().email().optional().or(z.literal("")).default(""),
-});
+const env = {
+  nodeEnv: process.env.NODE_ENV || "development",
+  port: Number(process.env.PORT || 3000),
+  databaseUrl: process.env.DATABASE_URL,
+  isManagerOn: String(process.env.IS_MANAGER_ON).toLowerCase() === "true",
+  apiKeyHeader: process.env.API_KEY_HEADER || "x-api-key",
+  processingIntervalMinutes: Number(process.env.PROCESSING_INTERVAL_MINUTES || 2),
+  cronDailySummary: process.env.CRON_DAILY_SUMMARY || "0 20 * * *",
+  jobTimezone: process.env.JOB_TIMEZONE || "America/Sao_Paulo",
 
-const parsed = envSchema.safeParse(process.env);
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    whatsappFrom: process.env.TWILIO_WHATSAPP_FROM,
+    smsFrom: process.env.TWILIO_SMS_FROM,
+    callFrom: process.env.TWILIO_CALL_FROM,
+  },
 
-if (!parsed.success) {
-  throw new Error(
-    `Variaveis de ambiente invalidas: ${parsed.error.errors
-      .map((error) => `${error.path.join(".")}: ${error.message}`)
-      .join(", ")}`,
-  );
-}
+  resendApiKey: process.env.RESEND_API_KEY,
+  emailFrom: process.env.EMAIL_FROM,
+  adminWhatsappTo: process.env.ADMIN_WHATSAPP_TO,
+};
 
-module.exports = parsed.data;
+export default env;

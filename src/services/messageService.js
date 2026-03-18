@@ -1,108 +1,78 @@
-const prisma = require("../lib/prisma");
-const HttpError = require("../lib/httpError");
-const logger = require("../lib/logger");
+﻿import prisma from "../config/prisma.js";
+import { getSenderByType } from "./senderFactory.js";
 
-async function assertRateLimit(apiKeyId, limit) {
-  const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+const PROCESS_BATCH_SIZE = 50;
 
-  const messagesInWindow = await prisma.message.count({
-    where: {
-      apiKeyId,
-      createdAt: {
-        gte: oneMinuteAgo,
-      },
-    },
-  });
-
-  if (messagesInWindow >= limit) {
-    throw new HttpError(429, "Limite de mensagens por minuto excedido");
-  }
-}
-
-async function createMessage(data, apiKey) {
-  await assertRateLimit(apiKey.id, apiKey.limit);
-
+export async function createMessage(data, apiKey) {
   const message = await prisma.message.create({
     data: {
-      ...data,
+      title: data.title,
+      text: data.text,
+      type: data.type,
+      phone: data.phone || null,
+      email: data.email || null,
+      discordWebhook: data.discordWebhook || null,
       apiKeyId: apiKey.id,
+      status: "pending",
     },
   });
 
-  logger.info(
-    {
-      messageId: message.id,
-      apiKeyId: apiKey.id,
-      type: message.type,
+  await prisma.apiKey.update({
+    where: { id: apiKey.id },
+    data: {
+      lastSend: new Date(),
+      totalMessages: { increment: 1 },
     },
-    "message queued",
-  );
+  });
 
   return message;
 }
 
-async function listMessages(filters, apiKey) {
-  const sendDateFilter = filters.sendDate
-    ? filters.sendDate.length <= 10
-      ? {
-          gte: new Date(`${filters.sendDate}T00:00:00.000Z`),
-          lt: new Date(`${filters.sendDate}T23:59:59.999Z`),
-        }
-      : {
-          gte: new Date(filters.sendDate),
-          lte: new Date(filters.sendDate),
-        }
-    : undefined;
+export async function getMessageById(id) {
+  return prisma.message.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      type: true,
+      sendDate: true,
+    },
+  });
+}
 
-  return prisma.message.findMany({
+export async function processPendingMessages() {
+  const messages = await prisma.message.findMany({
     where: {
-      apiKeyId: apiKey.id,
-      id: filters.id,
-      status: filters.status,
-      type: filters.type,
-      sendDate: sendDateFilter,
+      OR: [{ status: "pending" }, { status: "failure" }],
     },
-    include: {
-      apiKey: {
-        select: {
-          id: true,
-          name: true,
+    orderBy: { createdAt: "asc" },
+    take: PROCESS_BATCH_SIZE,
+  });
+
+  for (const message of messages) {
+    try {
+      const sender = getSenderByType(message.type);
+      await sender(message);
+
+      await prisma.message.update({
+        where: { id: message.id },
+        data: {
+          status: "sent",
+          sendDate: new Date(),
         },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: filters.limit,
-  });
+      });
+    } catch (error) {
+      await prisma.message.update({
+        where: { id: message.id },
+        data: {
+          status: "failure",
+        },
+      });
+
+      // eslint-disable-next-line no-console
+      console.error(`[PROCESSING_ERROR] messageId=${message.id}`, error.message);
+    }
+  }
+
+  return messages.length;
 }
-
-async function cancelPendingMessage(id, apiKey) {
-  const message = await prisma.message.findUnique({
-    where: { id },
-  });
-
-  if (!message) {
-    throw new HttpError(404, "Mensagem nao encontrada");
-  }
-
-  if (message.apiKeyId !== apiKey.id) {
-    throw new HttpError(403, "Acesso negado para esta mensagem");
-  }
-
-  if (message.status !== "pending") {
-    throw new HttpError(400, "Apenas mensagens pendentes podem ser canceladas");
-  }
-
-  await prisma.message.delete({
-    where: { id },
-  });
-
-  logger.info({ messageId: id }, "message cancelled");
-}
-
-module.exports = {
-  createMessage,
-  listMessages,
-  cancelPendingMessage,
-};

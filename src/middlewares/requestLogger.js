@@ -1,4 +1,0 @@
-const pinoHttp = require("pino-http");
-const logger = require("../lib/logger");
-
-module.exports = pinoHttp({ logger });

@@ -1,34 +1,26 @@
-const express = require("express");
-const path = require("path");
-const cors = require("cors");
-const helmet = require("helmet");
-const swaggerUi = require("swagger-ui-express");
-const messageRoutes = require("./routes/messageRoutes");
-const keyRoutes = require("./routes/keyRoutes");
-const requestLogger = require("./middlewares/requestLogger");
-const errorHandler = require("./middlewares/errorHandler");
-const swaggerSpec = require("./config/swagger");
+﻿import express from "express";
+import cors from "cors";
+import messageRoutes from "./routes/messageRoutes.js";
+import managerRoutes from "./routes/managerRoutes.js";
+import { mountSwagger } from "./swagger.js";
 
 const app = express();
 
-app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
-app.use(requestLogger);
-app.use(express.static(path.join(__dirname, "..", "public")));
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
-app.get("/dashboard", (_req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "dashboard.html"));
+app.use(messageRoutes);
+app.use(managerRoutes);
+mountSwagger(app);
+
+app.use((err, req, res, next) => {
+  // eslint-disable-next-line no-console
+  console.error("[HTTP_ERROR]", err);
+  res.status(500).json({ status: "Erro", message: "Erro interno." });
 });
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use("/message", messageRoutes);
-app.use("/keys", keyRoutes);
-
-app.use(errorHandler);
-
-module.exports = app;
+export default app;

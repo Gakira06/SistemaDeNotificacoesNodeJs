@@ -1,58 +1,111 @@
-# Sistema de Notificacoes
+﻿# Notification Backend
 
-Backend em Node.js para enfileirar e enviar notificacoes por Discord, email, WhatsApp, SMS e ligacao telefonica usando PostgreSQL, Prisma e Swagger.
+Backend em Node.js com PostgreSQL (Prisma), autenticação por API key, processamento assíncrono de mensagens, jobs agendados e documentação Swagger.
 
-## Recursos
+## Funcionalidades
 
-- Autenticacao por `api-key` no header.
-- Cadastro e remocao de chaves protegidos por `IS_MANAGER_ON`.
-- Armazenamento seguro da chave com valor criptografado e hash de lookup.
-- Fila assincrona com job recorrente a cada 2 minutos.
-- Strategies separadas por canal de envio.
-- Swagger em `/docs`.
-- Dashboard simples em `/dashboard`.
-- Logs estruturados com `pino`.
+- POST `/message`: cria mensagem para processamento assíncrono.
+- GET `/message?id=...`: consulta `id`, `status`, `type` e `sendDate`.
+- POST `/manager/key`: cria API key (somente com `IS_MANAGER_ON=true`).
+- DELETE `/manager/key/:id`: remove API key (somente com `IS_MANAGER_ON=true`).
+- Job de processamento a cada X minutos (`PROCESSING_INTERVAL_MINUTES`, padrão 2).
+- Job diário às 20h (`CRON_DAILY_SUMMARY`) com resumo do dia anterior via WhatsApp para administrador.
 
-## Como executar
+## Tipos de envio
 
-1. Instale dependencias:
+- `whatsapp` via Twilio
+- `sms` via Twilio
+- `phoneCall` via Twilio
+- `email` via Resend
+- `discord` via webhook do Discord
 
-```bash
-npm install
-```
+## Banco de dados (Prisma)
 
-2. Configure o ambiente:
+### Entidades
+
+- `Message`
+  - `id`
+  - `createdAt`
+  - `status` (`pending`, `sent`, `failure`)
+  - `sendDate`
+  - `title`
+  - `text`
+  - `type` (`discord`, `email`, `whatsapp`, `sms`, `phoneCall`)
+  - opcionais: `phone`, `email`, `discordWebhook`
+
+- `ApiKey`
+  - `id` (sequencial)
+  - `keyHash` (chave armazenada criptografada)
+  - `limitPerMinute`
+  - `lastSend`
+  - `totalMessages`
+  - `name`
+
+## Setup
+
+1. Copiar o arquivo de ambiente:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Gere o client do Prisma e aplique o schema:
+2. Instalar dependências:
 
 ```bash
-npx prisma generate
-npx prisma db push
+npm install
 ```
 
-4. Inicie o projeto:
+3. Gerar client Prisma e rodar migration:
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate -- --name init
+```
+
+4. Iniciar em desenvolvimento:
 
 ```bash
 npm run dev
 ```
 
-## Variaveis principais
+## Swagger
 
-- `DATABASE_URL`: conexao PostgreSQL.
-- `APP_SECRET`: segredo usado para criptografia e hash da `api-key`.
-- `IS_MANAGER_ON`: habilita ou bloqueia `POST /keys` e `DELETE /keys/:id`.
-- `JOB_INTERVAL_MS`: intervalo do processador. O padrao e `120000`.
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`: integracoes de WhatsApp, SMS e ligacoes.
-- `RESEND_API_KEY`, `RESEND_FROM_EMAIL`: integracao de email.
+Com a API rodando:
 
-## Fluxo resumido
+- `http://localhost:3000/docs`
 
-1. Crie uma chave em `POST /keys`.
-2. Use a chave retornada no header `api-key`.
-3. Envie notificacoes com `POST /message`.
-4. O job busca mensagens `pending` e `failure` no intervalo configurado.
-5. Consulte o status com `GET /message` ou acompanhe pelo dashboard.
+## Exemplos
+
+### Criar API key
+
+```bash
+curl -X POST http://localhost:3000/manager/key \
+  -H "Content-Type: application/json" \
+  -d '{"name":"cliente-a", "limit": 10}'
+```
+
+### Enviar mensagem
+
+```bash
+curl -X POST http://localhost:3000/message \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: SUA_CHAVE" \
+  -d '{
+    "title":"Aviso",
+    "text":"Teste de envio",
+    "type":"whatsapp",
+    "phone":"whatsapp:+5511999999999"
+  }'
+```
+
+### Consultar mensagem
+
+```bash
+curl "http://localhost:3000/message?id=<MESSAGE_ID>"
+```
+
+## Observações
+
+- Processamento é assíncrono: a rota POST apenas enfileira no banco.
+- Mensagens com status `pending` ou `failure` são reprocessadas pelo job.
+- Se `IS_MANAGER_ON=false`, rotas de manager retornam `401`.

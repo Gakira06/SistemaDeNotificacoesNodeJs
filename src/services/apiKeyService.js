@@ -1,52 +1,38 @@
-const { v4: uuidv4 } = require("uuid");
-const prisma = require("../lib/prisma");
-const { createKeyHash, encrypt } = require("../lib/crypto");
-const HttpError = require("../lib/httpError");
+﻿import crypto from "node:crypto";
+import prisma from "../config/prisma.js";
+import { hashApiKey } from "../utils/crypto.js";
 
-async function createApiKey({ name, limit }) {
-  const plainKey = uuidv4();
+export async function createApiKey({ name, limitPerMinute }) {
+  const rawKey = crypto.randomUUID();
+  const keyHash = await hashApiKey(rawKey);
 
   const apiKey = await prisma.apiKey.create({
     data: {
       name,
-      limit,
-      key: encrypt(plainKey),
-      keyHash: createKeyHash(plainKey),
+      keyHash,
+      limitPerMinute,
+    },
+    select: {
+      id: true,
+      name: true,
+      limitPerMinute: true,
+      totalMessages: true,
+      createdAt: true,
     },
   });
 
   return {
-    id: apiKey.id,
-    name: apiKey.name,
-    limit: apiKey.limit,
-    key: plainKey,
+    ...apiKey,
+    key: rawKey,
   };
 }
 
-async function deleteApiKey(id) {
-  const existing = await prisma.apiKey.findUnique({
-    where: { id: Number(id) },
-  });
-
-  if (!existing) {
-    throw new HttpError(404, "API key nao encontrada");
-  }
-
-  await prisma.apiKey.delete({
-    where: { id: Number(id) },
-  });
-}
-
-async function validateApiKey(rawApiKey) {
-  return prisma.apiKey.findUnique({
-    where: {
-      keyHash: createKeyHash(rawApiKey),
+export async function removeApiKey(id) {
+  return prisma.apiKey.delete({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
     },
   });
 }
-
-module.exports = {
-  createApiKey,
-  deleteApiKey,
-  validateApiKey,
-};

@@ -7,6 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Message {
+  id             String        @id @default(uuid())
+  createdAt      DateTime      @default(now())
+  status         MessageStatus @default(pending)
+  sendDate       DateTime?
+  title          String
+  text           String
+  type           MessageType
+  phone          String?
+  email          String?
+  discordWebhook String?
+  apiKeyId       Int?
+  apiKey         ApiKey?       @relation(fields: [apiKeyId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id             Int       @id @default(autoincrement())
+  keyHash        String
+  limitPerMinute Int       @default(1)
+  lastSend       DateTime?
+  totalMessages  Int       @default(0)
+  name           String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  messages       Message[]
+}
+
 enum MessageStatus {
   pending
   sent
@@ -19,40 +49,4 @@ enum MessageType {
   whatsapp
   sms
   phoneCall
-}
-
-model Message {
-  id             String        @id @default(uuid())
-  createdAt      DateTime      @default(now())
-  status         MessageStatus @default(pending)
-  sendDate       DateTime?
-  title          String
-  text           String
-  type           MessageType
-  phone          String?
-  email          String?
-  discordWebhook String?
-  attemptCount   Int           @default(0)
-  lastError      String?
-  apiKeyId       Int
-  apiKey         ApiKey        @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
-
-  @@index([status, sendDate])
-  @@index([type])
-  @@index([createdAt])
-  @@index([apiKeyId, createdAt])
-}
-
-model ApiKey {
-  id             Int       @id @default(autoincrement())
-  key            String
-  keyHash        String    @unique
-  limit          Int
-  lastSend       DateTime?
-  totalMensagens Int       @default(0)
-  name           String
-  createdAt      DateTime  @default(now())
-  messages       Message[]
-
-  @@index([name])
 }
