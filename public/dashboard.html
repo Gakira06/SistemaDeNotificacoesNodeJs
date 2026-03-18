@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard de Notificacoes</title>
+    <style>
+      :root {
+        --bg: #f3efe5;
+        --panel: rgba(255, 250, 240, 0.92);
+        --ink: #1f2937;
+        --muted: #52606d;
+        --accent: #bf5b04;
+        --accent-2: #0f766e;
+        --danger: #b42318;
+        --border: rgba(31, 41, 55, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(191, 91, 4, 0.18), transparent 32%),
+          radial-gradient(circle at top right, rgba(15, 118, 110, 0.2), transparent 28%),
+          linear-gradient(135deg, #f6f0e3, #efe7d5 45%, #e6dcc8);
+        min-height: 100vh;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 0.95;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 720px;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin: 20px 0 24px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 24px 60px rgba(31, 41, 55, 0.08);
+        backdrop-filter: blur(10px);
+      }
+
+      .metric {
+        padding: 18px 20px;
+      }
+
+      .metric h2 {
+        margin: 0 0 8px;
+        font-size: 0.9rem;
+        font-weight: normal;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .metric strong {
+        font-size: 2rem;
+      }
+
+      .controls,
+      .table-wrap {
+        padding: 20px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      button {
+        width: fit-content;
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        background: linear-gradient(135deg, var(--accent), #e07a1f);
+        color: white;
+        cursor: pointer;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .status {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.82rem;
+      }
+
+      .pending {
+        background: rgba(191, 91, 4, 0.12);
+        color: var(--accent);
+      }
+
+      .sent {
+        background: rgba(15, 118, 110, 0.12);
+        color: var(--accent-2);
+      }
+
+      .failure {
+        background: rgba(180, 35, 24, 0.12);
+        color: var(--danger);
+      }
+
+      .error {
+        color: var(--danger);
+      }
+
+      @media (max-width: 720px) {
+        .table-wrap {
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <h1>Controle de Envios</h1>
+        <p>
+          Acompanhe o volume, o status e as ultimas tentativas de notificacao em tempo real. O painel
+          consulta a API a cada 5 segundos usando a mesma `api-key` do cliente.
+        </p>
+      </section>
+
+      <section class="panel controls">
+        <label>
+          API Key
+          <input id="apiKey" placeholder="Cole sua api-key" />
+        </label>
+        <label>
+          Filtrar por status
+          <select id="status">
+            <option value="">Todos</option>
+            <option value="pending">pending</option>
+            <option value="sent">sent</option>
+            <option value="failure">failure</option>
+          </select>
+        </label>
+        <button id="refresh">Atualizar agora</button>
+        <div id="feedback"></div>
+      </section>
+
+      <section class="grid">
+        <article class="panel metric">
+          <h2>Total exibido</h2>
+          <strong id="total">0</strong>
+        </article>
+        <article class="panel metric">
+          <h2>Pendentes</h2>
+          <strong id="pending">0</strong>
+        </article>
+        <article class="panel metric">
+          <h2>Enviadas</h2>
+          <strong id="sent">0</strong>
+        </article>
+        <article class="panel metric">
+          <h2>Falhas</h2>
+          <strong id="failure">0</strong>
+        </article>
+      </section>
+
+      <section class="panel table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>Titulo</th>
+              <th>Criada em</th>
+              <th>Envio</th>
+              <th>Erro</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script>
+      const apiKeyInput = document.getElementById("apiKey");
+      const statusInput = document.getElementById("status");
+      const feedback = document.getElementById("feedback");
+      const rows = document.getElementById("rows");
+
+      function setMetric(id, value) {
+        document.getElementById(id).textContent = value;
+      }
+
+      function renderRows(messages) {
+        rows.innerHTML = messages
+          .map(
+            (message) => `
+              <tr>
+                <td>${message.id}</td>
+                <td>${message.type}</td>
+                <td><span class="status ${message.status}">${message.status}</span></td>
+                <td>${message.title}</td>
+                <td>${new Date(message.createdAt).toLocaleString("pt-BR")}</td>
+                <td>${message.sendDate ? new Date(message.sendDate).toLocaleString("pt-BR") : "-"}</td>
+                <td class="${message.lastError ? "error" : ""}">${message.lastError || "-"}</td>
+              </tr>`,
+          )
+          .join("");
+      }
+
+      async function loadMessages() {
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+          feedback.textContent = "Informe a api-key para carregar os dados.";
+          return;
+        }
+
+        const params = new URLSearchParams({ limit: "50" });
+        if (statusInput.value) {
+          params.append("status", statusInput.value);
+        }
+
+        const response = await fetch(`/message?${params.toString()}`, {
+          headers: {
+            "api-key": apiKey,
+          },
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({ error: "Erro desconhecido" }));
+          throw new Error(payload.error || "Falha ao carregar mensagens");
+        }
+
+        const messages = await response.json();
+        feedback.textContent = `Atualizado em ${new Date().toLocaleTimeString("pt-BR")}`;
+        setMetric("total", messages.length);
+        setMetric("pending", messages.filter((item) => item.status === "pending").length);
+        setMetric("sent", messages.filter((item) => item.status === "sent").length);
+        setMetric("failure", messages.filter((item) => item.status === "failure").length);
+        renderRows(messages);
+      }
+
+      async function refresh() {
+        try {
+          await loadMessages();
+        } catch (error) {
+          feedback.textContent = error.message;
+          feedback.className = "error";
+        }
+      }
+
+      document.getElementById("refresh").addEventListener("click", refresh);
+      statusInput.addEventListener("change", refresh);
+      setInterval(refresh, 5000);
+    </script>
+  </body>
+</html>

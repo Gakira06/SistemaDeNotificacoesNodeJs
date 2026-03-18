@@ -1,0 +1,54 @@
+{
+  "name": "sistema-de-notificacoes",
+  "description": "Backend de notificacoes com Node.js, PostgreSQL, Prisma e Swagger.",
+  "repository": "",
+  "logo": "",
+  "keywords": [
+    "node",
+    "express",
+    "postgresql",
+    "prisma",
+    "swagger",
+    "twilio",
+    "resend"
+  ],
+  "env": {
+    "APP_SECRET": {
+      "description": "Segredo usado para hash e criptografia das API keys",
+      "generator": "secret"
+    },
+    "IS_MANAGER_ON": {
+      "description": "Habilita rotas de gerenciamento de chaves",
+      "value": "true"
+    },
+    "JOB_INTERVAL_MS": {
+      "description": "Intervalo do job de envio em milissegundos",
+      "value": "120000"
+    },
+    "TWILIO_ACCOUNT_SID": {
+      "description": "SID da conta Twilio"
+    },
+    "TWILIO_AUTH_TOKEN": {
+      "description": "Token da conta Twilio"
+    },
+    "TWILIO_PHONE_NUMBER": {
+      "description": "Numero de origem no Twilio"
+    },
+    "RESEND_API_KEY": {
+      "description": "Chave da API Resend"
+    },
+    "RESEND_FROM_EMAIL": {
+      "description": "Email remetente validado no Resend",
+      "value": "noreply@example.com"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    "heroku-postgresql:essential-0"
+  ]
+}
